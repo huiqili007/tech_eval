@@ -1,0 +1,70 @@
+---
+title: "tech eval"
+output: html_document
+date: "2024-08-30"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(gsheet) 
+library(dplyr)
+library(ggplot2)
+library(geepack)
+library(splines)
+
+data <- gsheet2tbl('https://drive.google.com/open?id=1jKe6kIGEuqyF8KANVzRhDCAGa7v8uM1m')
+```
+
+## Figures
+```{r graphs, echo=FALSE, warning=FALSE}
+ggplot(data, aes(Time_point, C1, group = Sample_ID, color = as.factor(sex))) + 
+  geom_line(linewidth = .1) +
+  stat_summary(aes(group = sex), geom = "point", fun.y = mean,  shape = 17, size = 3) 
+
+ggplot(data, aes(Time_point, C2, group = Sample_ID, color = as.factor(sex))) + 
+  geom_line(linewidth = .1) +
+  stat_summary(aes(group = sex), geom = "point", fun.y = mean,  shape = 17, size = 3) 
+
+ggplot(data, aes(Time_point, C3, group = Sample_ID, color = as.factor(sex))) + 
+  geom_line(linewidth = .1) +
+  stat_summary(aes(group = sex), geom = "point", fun.y = mean,  shape = 17, size = 3) 
+
+ggplot(data, aes(Time_point, C4, group = Sample_ID, color = as.factor(sex))) + 
+  geom_line(linewidth = .1) +
+  stat_summary(aes(group = sex), geom = "point", fun.y = mean,  shape = 17, size = 3) 
+
+
+```
+
+## GEE model
+### C1
+```{r GEE model, echo=FALSE, warning=FALSE}
+data_c1 <- data %>% filter(!is.na(C1),!is.na(Time_point), !is.na(sex), !is.na(Sample_ID))
+gee_c1 <- geeglm(C1 ~ Time_point+sex, id=Sample_ID, data=data_c1, corstr="ar1", family=gaussian)
+summary(gee_c1)
+```
+
+### If assume equal time gaps
+```{r GEE equal time gaps, echo=FALSE, warning=FALSE}
+data_c1b <- data_c1 %>% mutate(time=case_when(Time_point=="a" ~ 1,
+                                              Time_point=="b" ~ 2,
+                                              Time_point=="c" ~ 3,
+                                              Time_point=="d" ~ 4,
+                                              Time_point=="e" ~ 5,
+                                              Time_point=="f" ~ 6,
+                                              Time_point=="g" ~ 7,
+                                              Time_point=="h" ~ 8))
+gee_c1b <- geeglm(C1 ~ time+sex, id=Sample_ID, data=data_c1b, corstr="ar1", family=gaussian)
+summary(gee_c1b)
+```
+
+### Smoothed effect over time
+```{r spline, echo=F, warning=FALSE}
+gee_c1c <- geeglm(C1 ~ ns(time,3)+sex, id=Sample_ID, data=data_c1b, corstr="ar1", family=gaussian)
+summary(gee_c1c)
+data_c1c<- data_c1b %>% mutate(C1_pred=predict(gee_c1c))
+
+ggplot(data_c1c, aes(Time_point, C1_pred, group=sex, color=as.factor(sex))) + geom_smooth()
+
+```
+
